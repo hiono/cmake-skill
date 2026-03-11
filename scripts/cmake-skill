@@ -23,6 +23,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from jinja2 import Template
+
 
 @dataclass
 class Diagnostic:
