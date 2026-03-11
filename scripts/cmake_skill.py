@@ -216,7 +216,20 @@ def main() -> int:
     report_json = report_dir / "report.json"
     report_json.write_text(json.dumps(all_results, indent=2, ensure_ascii=False))
 
-    print(str(project_root / "cmake_report.md"))
+    # Final concise output for Token efficiency
+    total_errors = sum(len(v["errors"]) for v in all_results.values())
+    summary = {
+        "quick_ref": {
+            "success": overall_success,
+            "total_errors": total_errors,
+            "steps": {k: ("SUCCESS" if v["success"] else "FAILED") for k, v in all_results.items()},
+        },
+        "artifacts": {
+            "human_report": str(project_root / "cmake_report.md"),
+            "machine_report": str(report_json.resolve()),
+        },
+    }
+    print(json.dumps(summary, ensure_ascii=False))
     return 0 if overall_success else 1
 
 
