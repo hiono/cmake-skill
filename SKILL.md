@@ -32,10 +32,11 @@ cmake-skill test
 ## Agent Protocol
 
 When a build or test fails, the agent should:
-1.  Read the structured report at the path output by the command
+
+1. Read the structured report at the path output by the command
     (e.g., `build/{preset}/.lint/cmake_build.json`).
-2.  Analyze `errors` for missing headers, syntax errors, or linker issues.
-3.  Consult [protocol.md](references/protocol.md) for recovery strategies.
+2. Analyze `errors` for missing headers, syntax errors, or linker issues.
+3. Consult [protocol.md](references/protocol.md) for recovery strategies.
 
 ## Integration
 
