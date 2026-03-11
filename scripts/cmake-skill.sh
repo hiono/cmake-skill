@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-python3 "$SCRIPT_DIR/cmake_skill.py" "$@"
+uv run "$SCRIPT_DIR/cmake_skill.py" "$@"

@@ -29,28 +29,33 @@ class Diagnostic:
     message: str
     check: str = "cmake-build"
 
-# --- Reporting Template ---
+# --- Reporting Template (Dashboard Style) ---
 MARKDOWN_TEMPLATE = """
-# CMake Automation Report ({{ timestamp }})
+# Project Build Dashboard ({{ timestamp }})
 
-{% for phase, data in results.items() %}
-## Phase: {{ phase|capitalize }} ({% if data.success %}✅ SUCCESS{% else %}❌ FAILED{% endif %})
+| Phase | Status | Last Run |
+|---|---|---|
+| Configure | {{ results.configure.status_icon }} | {{ results.configure.last_run or 'N/A' }} |
+| Build | {{ results.build.status_icon }} | {{ results.build.last_run or 'N/A' }} |
+| Test | {{ results.test.status_icon }} | {{ results.test.last_run or 'N/A' }} |
 
-{% if data.errors %}
+{% for phase, data in results.items() if data.errors %}
+### ❌ {{ phase|capitalize }} Errors
 | Severity | File | Line | Message |
 |---|---|---:|---|
 {% for e in data.errors -%}
 | {{ e.severity }} | `{{ e.file or 'N/A' }}` | {{ e.line or '' }} | {{ e.message }} |
 {% endfor %}
-{% endif %}
 {% endfor %}
+
+---
+*Detailed reports available in build dir's `.lint` folder.*
 """
 
 def run_cmd(cmd: List[str], cwd: Path) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, env=os.environ)
 
 def parse_cmake_errors(stderr: str) -> List[Diagnostic]:
-    """Parses CMake configuration errors."""
     errors = []
     pattern = re.compile(r"CMake (Error|Warning) at (.*?):(\d+)")
     for line in stderr.splitlines():
@@ -62,7 +67,6 @@ def parse_cmake_errors(stderr: str) -> List[Diagnostic]:
     return errors
 
 def parse_compiler_json(output: str) -> List[Diagnostic]:
-    """Parses GCC/Clang JSON diagnostics."""
     diags = []
     try:
         data = json.loads(output)
@@ -84,7 +88,6 @@ def main() -> int:
     ap.add_argument("--target", action="append", default=[])
     ap.add_argument("--clean", action="store_true")
     ap.add_argument("--jobs", "-j", type=int, default=multiprocessing.cpu_count())
-    ap.add_argument("--output-dir", default=".lint")
     args = ap.parse_args()
 
     root = Path(args.project_root).resolve()
@@ -107,45 +110,63 @@ def main() -> int:
     build_dir = root / "build" / preset
     if args.clean and build_dir.exists(): shutil.rmtree(build_dir)
     build_dir.mkdir(parents=True, exist_ok=True)
-    report_dir = build_dir / args.output_dir
+    report_dir = build_dir / ".lint"
     report_dir.mkdir(exist_ok=True)
+    report_json_path = report_dir / "cmake_report.json"
+
+    # --- Persistence Logic: Load existing state ---
+    if report_json_path.exists() and not args.clean:
+        try: all_results = json.loads(report_json_path.read_text())
+        except: all_results = {}
+    else: all_results = {}
+
+    # Ensure all phases have a default state
+    for p in ["configure", "build", "test"]:
+        if p not in all_results:
+            all_results[p] = {"success": None, "errors": [], "status_icon": "⚪️ PENDING", "last_run": None}
 
     steps = ["configure", "build", "test"] if args.action == "pipeline" else [args.action]
-    all_results, overall_success = {}, True
+    overall_success = True
+    current_ts = datetime.now().isoformat()
 
     for step in steps:
+        res_data = {"success": False, "errors": [], "last_run": current_ts}
         if step == "configure":
             cmd = ["cmake", "-S", str(root), "-B", str(build_dir), f"--preset={preset}", "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"]
             res = run_cmd(cmd, root)
-            all_results[step] = {"success": res.returncode == 0, "errors": [asdict(d) for d in parse_cmake_errors(res.stderr)]}
+            res_data["success"] = (res.returncode == 0)
+            if not res_data["success"]: res_data["errors"] = [asdict(d) for d in parse_cmake_errors(res.stderr)]
         elif step == "build":
             cmd = ["cmake", "--build", str(build_dir), "--parallel", str(args.jobs)]
             for t in args.target: cmd.extend(["--target", t])
             res = run_cmd(cmd, root)
-            success = res.returncode == 0
-            errs = [asdict(d) for d in parse_compiler_json(res.stderr)] if not success else []
-            if not success and not errs: errs = [asdict(Diagnostic(None, None, None, "error", res.stderr + res.stdout))]
-            all_results[step] = {"success": success, "errors": errs}
-        else:
+            res_data["success"] = (res.returncode == 0)
+            errs = [asdict(d) for d in parse_compiler_json(res.stderr + res.stdout)] if not res_data["success"] else []
+            if not res_data["success"] and not errs: errs = [asdict(Diagnostic(None, None, None, "error", res.stderr + res.stdout))]
+            res_data["errors"] = errs
+        elif step == "test":
             cmd = ["ctest", "--test-dir", str(build_dir), "--preset", preset, "-j", str(args.jobs), "--output-on-failure"]
             res = run_cmd(cmd, root)
-            all_results[step] = {"success": res.returncode == 0, "errors": [asdict(Diagnostic("CTest", None, None, "error", res.stdout + res.stderr))] if res.returncode != 0 else []}
+            res_data["success"] = (res.returncode == 0)
+            if not res_data["success"]: res_data["errors"] = [asdict(Diagnostic("CTest", None, None, "error", res.stdout + res.stderr))]
 
-        if not all_results[step]["success"]:
+        res_data["status_icon"] = "✅ SUCCESS" if res_data["success"] else "❌ FAILED"
+        all_results[step] = res_data
+        
+        if not res_data["success"]:
             overall_success = False
             break
 
-    # Final Reporting using Jinja2
+    # Save state and render dashboard
+    report_json_path.write_text(json.dumps(all_results, indent=2, ensure_ascii=False))
+    
     template = Template(MARKDOWN_TEMPLATE)
     report_md = template.render(timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"), results=all_results)
     (root / "cmake_report.md").write_text(report_md)
-    
-    rep_json = report_dir / "cmake_report.json"
-    rep_json.write_text(json.dumps(all_results, indent=2, ensure_ascii=False))
 
     summary = {
-        "quick_ref": {"success": overall_success, "steps": {k: ("SUCCESS" if v["success"] else "FAILED") for k, v in all_results.items()}},
-        "artifacts": {"machine_report": str(rep_json.resolve())}
+        "quick_ref": {"success": overall_success, "steps": {k: v["status_icon"] for k, v in all_results.items()}},
+        "artifacts": {"machine_report": str(report_json_path.resolve())}
     }
     print(json.dumps(summary, ensure_ascii=False))
     return 0 if overall_success else 1
