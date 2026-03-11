@@ -48,7 +48,8 @@ jq '.build.errors[] | select(.file | contains("state_machine.cpp"))' <machine_re
 
 ```bash
 # List all failed steps with their first error message
-jq '. | to_entries[] | select(.value.success == false) | {step: .key, first_error: .value.errors[0].message}' <machine_report>
+jq '. | to_entries[] | select(.value.success == false) | {step: .key, first_error: .value.errors[0].message}' \\
+  <machine_report>
 
 # Filter errors by a specific source file
 jq '.build.errors[] | select(.file | contains("state_machine.cpp"))' <machine_report>
