@@ -1,0 +1,22 @@
+# Agent Reasoning & Action Protocol: CMake
+
+Follow this logic when handling CMake build/test cycles:
+
+## 1. Discovery Phase
+- If the agent doesn't know which preset to use, run `cmake-skill list`.
+- **Preference**: Use `dev` or `default` presets for local development.
+
+## 2. Recovery Strategies (Autonomous Fixing)
+
+### Build Failures
+- **Missing Header**: Check if the header exists in `include/` or `src/`. If it's a dependency, ensure `vcpkg` or `CPM` is initialized.
+- **Linker Error**: Verify that the source file is added to `add_library` or `add_executable` in the corresponding `CMakeLists.txt`.
+- **Syntax Error**: Open the file at the reported `line`/`column` and apply a fix.
+
+### Configuration Failures
+- **Missing Database**: If `compile_commands.json` is missing, run `cmake-skill configure`.
+- **Toolchain Issues**: Ensure `clang` or the expected compiler is in the PATH.
+
+## 3. Verification
+- After any fix, **Always** re-run `cmake-skill build` then `cmake-skill test`.
+- Success is only achieved when `success: true` is reported in the final JSON.
