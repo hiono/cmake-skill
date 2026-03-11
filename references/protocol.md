@@ -41,5 +41,15 @@ jq '.quick_ref.steps' <machine_report>
 jq '.build.errors' <machine_report>
 
 # Filter build errors by file
-jq '.build.errors[] | select(.file == "src/main.cpp")' <machine_report>
+jq '.build.errors[] | select(.file | contains("state_machine.cpp"))' <machine_report>
+```
+
+## 5. Advanced jq Triage Patterns
+
+```bash
+# List all failed steps with their first error message
+jq '. | to_entries[] | select(.value.success == false) | {step: .key, first_error: .value.errors[0].message}' <machine_report>
+
+# Filter errors by a specific source file
+jq '.build.errors[] | select(.file | contains("state_machine.cpp"))' <machine_report>
 ```
