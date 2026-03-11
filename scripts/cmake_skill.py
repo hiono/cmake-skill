@@ -89,19 +89,19 @@ def configure_project(root: Path, build_dir: Path, preset: str) -> Dict[str, Any
         "success": res.returncode == 0,
         "errors": [asdict(d) for d in parse_cmake_errors(res.stderr)],
     }
-
-
-def build_project(
-    root: Path, build_dir: Path, jobs: int, targets: List[str]
-) -> Dict[str, Any]:
+def build_project(root: Path, build_dir: Path, jobs: int, targets: List[str]) -> Dict[str, Any]:
     cmd = ["cmake", "--build", str(build_dir), "--parallel", str(jobs)]
     for t in targets:
         cmd.extend(["--target", t])
     res = run_cmd(cmd, root)
     success = res.returncode == 0
-    errors = [asdict(d) for d in parse_compiler_json(res.stderr)] if not success else []
+
+    # Combined output for parsing
+    output = res.stdout + res.stderr
+    errors = [asdict(d) for d in parse_compiler_json(output)] if not success else []
+
     if not success and not errors:
-        errors = [asdict(Diagnostic(None, None, None, "error", res.stderr))]
+        errors = [asdict(Diagnostic(None, None, None, "error", output))]
     return {"success": success, "errors": errors}
 
 
@@ -192,19 +192,19 @@ def main() -> int:
             break
 
     # Save structured report
-    rep_json = report_dir / "report.json"
+    rep_json = report_dir / "cmake_report.json"
     rep_json.write_text(json.dumps(all_results, indent=2, ensure_ascii=False))
 
     # Token-efficient summary
     summary = {
         "quick_ref": {
             "success": overall_success,
-            "steps": {
-                k: ("SUCCESS" if v["success"] else "FAILED")
-                for k, v in all_results.items()
-            },
+            "steps": {k: ("SUCCESS" if v["success"] else "FAILED") for k, v in all_results.items()},
         },
-        "artifacts": {"machine_report": str(rep_json.resolve())},
+        "artifacts": {
+            "human_report": str(root / "cmake_report.md"),
+            "machine_report": str(rep_json.resolve()),
+        },
     }
     print(json.dumps(summary, ensure_ascii=False))
     return 0 if overall_success else 1
