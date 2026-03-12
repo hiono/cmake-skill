@@ -1,29 +1,51 @@
-# cmake-skill
+# cmake-skill 🤖 [AI Agent Skill]
 
-Agent-Native CMake automation pipeline with persistent dashboard reporting.
+**Zero-Setup, Dashboard-Driven CMake Automation for Autonomous AI Agents.**
 
-## Features
+`cmake-skill` is a streamlined, agent-native interface for managing the complete
+build lifecycle. It provides persistent dashboarding, robust multi-line error
+parsing, and integrated static analysis—all with zero environment setup.
 
-- **Zero-Setup**: Powered by `uv run`. Dependencies (Jinja2) are handled automatically.
-- **Robust Parsing**: State-machine based parser captures multi-line errors and full call stacks.
-- **Static Analysis**: Integrated `cmake-lint` and `cmake-format --check`.
-- **Custom Commands**: Supports custom command specifications (e.g., CPM.cmake) via `.cmake-format.py`.
-- **Persistent Dashboard**: Maintains state across runs in `cmake_report.md`.
-- **Pipeline Logic**: Supports atomic workflows: `format` -> `lint` -> `configure` -> `build` -> `test`.
+## 🌟 Key Features
 
-## Usage
+- **Zero-Setup**: Powered by `uv run` (PEP 723). Dependencies are handled
+  automatically.
+- **Robust Parsing**: State-machine parser captures multi-line errors and
+  full `include()` call stacks.
+- **Persistent Dashboard**: Maintains a stateful `cmake_report.md` at project
+  root for situational awareness.
+- **Full Pipeline**: Orchestrates `format` -> `lint` -> `configure` ->
+  `build` -> `test` in a single command.
+- **IP-Core Ready**: Custom command specs for `CPM.cmake` and IP-specific
+  conventions.
+
+## 🛠 Installation
 
 ```bash
-./scripts/cmake-skill pipeline   # Run full flow
-./scripts/cmake-skill format     # Check formatting
-./scripts/cmake-skill lint       # Run static analysis
-./scripts/cmake-skill configure  # Only configure
-./scripts/cmake-skill build      # Only build
-./scripts/cmake-skill test       # Only test
+# Clone to the standard skill location
+git clone https://github.com/hiono/cmake-skill ~/.agents/skills/cmake-skill
 ```
 
-## Requirements
+## 📖 Usage
 
-- `uv` (Fast Python package manager)
-- `cmake`, `ctest`, `ninja` (Build tools)
-- `cmake-format`, `cmake-lint` (Static analysis tools)
+Run directly as an executable (powered by `uv`):
+
+```bash
+# Run the full quality-gate pipeline
+./scripts/cmake-skill pipeline
+
+# Configure with precision error capture
+./scripts/cmake-skill configure
+
+# Static analysis for CMake scripts
+./scripts/cmake-skill lint
+```
+
+## 🤖 Reasoning Protocol
+
+The agent follows the **[protocol.md](references/protocol.md)** to maintain
+project health and recover from build failures autonomously.
+
+---
+
+Maintained by **hiono**. Updated to **v0.2.0** with Dashboard Architecture.
