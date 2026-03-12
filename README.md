@@ -1,70 +1,40 @@
 # cmake-skill 🤖 [AI Agent Skill]
 
-**High-Performance CMake Automation Pipeline for Autonomous AI Agents.**
+**Diagnostic-First CMake Automation for Autonomous AI Agents.**
 
-`cmake-skill` is a streamlined, agent-native interface for managing CMake
-projects. It handles configuration, parallel building, and testing with a
-focus on structured error reporting and token efficiency.
-
-Originally refactored from `mcp-cmake`, it is optimized for high-speed
-build/fix cycles.
+`cmake-skill` provides deep visibility into the CMake build lifecycle. It captures complex configuration failures and maintains a persistent view of project health across multiple development phases.
 
 ## 🌟 Key Features
 
-- **Zero-Setup**: Powered by `uv run` (PEP 723). No manual dependency
-  installation required.
-- **Heuristic Discovery**: Automatically finds `CMakePresets.json` and selects
-  appropriate presets.
-- **Persistent Dashboard**: Maintains state across runs in `cmake_report.md`.
-- **Agent-Ready**: Generates structured JSON/SARIF error reports for
-  autonomous agent reasoning.
-- **Surgical Building**: Parallelized builds with automatic structured
-  diagnostic injection.
-- **Clean Policy**: Stores all metadata and reports within the build
-  directory.
+- **Hierarchical Parsing**: State-machine engine captures multi-line error messages and full `include()` call stacks.
+- **Unified Pipeline**: Coordinated execution of formatting, linting, configuration, building, and testing.
+- **Persistent Status**: Tracks the state of each build phase across runs via a structured dashboard.
+- **Domain Specificity**: Custom command validation for IP development workflows (e.g., CPM.cmake integration).
 
-## 🛠 Skill Installation
+## 🛠 Installation
 
-### Global (Recommended)
+Requires `cmake`, `ninja`, and `uv`.
 
 ```bash
 git clone https://github.com/hiono/cmake-skill ~/.agents/skills/cmake-skill
-export PATH="$HOME/.agents/skills/cmake-skill/scripts:$PATH"
 ```
 
 ## 📖 Usage
 
 ```bash
-# List presets
-cmake-skill list
+# Run full quality-gate pipeline
+./scripts/cmake-skill pipeline
 
-# Configure (Auto-discovery)
-cmake-skill configure
+# Configure with precision error capture
+./scripts/cmake-skill configure
 
-# Build (Parallel)
-cmake-skill build
-
-# Test (CTest)
-cmake-skill test
-
-# Run full pipeline
-cmake-skill pipeline
+# Static analysis for CMake scripts
+./scripts/cmake-skill lint
 ```
-
-## 🔄 What's New in v0.2.0
-
-- **Single-File Architecture**: Script is now a single `.py` file (`cmake-skill`)
-  instead of separate Python + shell wrapper. Simpler installation!
-- **uv Run Powered**: Dependencies (Jinja2) handled automatically via `uv run`.
-  No manual `pip install` needed.
-- **Persistent Dashboard**: `cmake_report.md` now persists across runs, showing
-  build history and cumulative error data.
 
 ## 🤖 Reasoning Protocol
 
-The agent follows the **[protocol.md](references/protocol.md)** to recover
-from build failures autonomously by parsing the structured error logs.
+Refer to **[protocol.md](references/protocol.md)** to maintain project health and recover from build failures.
 
 ---
-
-Maintained by **hiono**. Distributed under the MIT License.
+Maintained by **hiono**. Updated to **v0.2.0** with Dashboard Architecture.
