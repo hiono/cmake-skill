@@ -8,7 +8,7 @@
 # -*- coding: utf-8 -*-
 """
 cmake-skill: Agent-Native CMake automation pipeline.
-Handles configuration, building, and testing with persistent dashboard reporting.
+Handles configuration, building, testing, linting, and formatting.
 """
 
 import argparse
@@ -28,7 +28,7 @@ from jinja2 import Template
 
 @dataclass
 class Diagnostic:
-    """Represents a diagnostic entry from CMake or the compiler."""
+    """Represents a diagnostic entry from CMake, the compiler, or linter."""
 
     file: Optional[str]
     line: Optional[int]
@@ -36,6 +36,7 @@ class Diagnostic:
     severity: str
     message: str
     check: str = "cmake-build"
+    call_stack: List[str] = None
 
 
 # --- Reporting Template (Dashboard Style) ---
@@ -44,16 +45,26 @@ MARKDOWN_TEMPLATE = """
 
 | Phase | Status | Last Run |
 |---|---|---|
+| Format | {{ results.format.status_icon }} | {{ results.format.last_run or 'N/A' }} |
+| Lint | {{ results.lint.status_icon }} | {{ results.lint.last_run or 'N/A' }} |
 | Configure | {{ results.configure.status_icon }} | {{ results.configure.last_run or 'N/A' }} |
 | Build | {{ results.build.status_icon }} | {{ results.build.last_run or 'N/A' }} |
 | Test | {{ results.test.status_icon }} | {{ results.test.last_run or 'N/A' }} |
 
 {% for phase, data in results.items() if data.errors %}
 ### ❌ {{ phase|capitalize }} Errors
-| Severity | File | Line | Message |
-|---|---|---:|---|
 {% for e in data.errors -%}
-| {{ e.severity }} | `{{ e.file or 'N/A' }}` | {{ e.line or '' }} | {{ e.message }} |
+#### {{ e.severity|capitalize }} in `{{ e.file or 'N/A' }}`:{{ e.line or '' }} {% if e.check != 'cmake-build' %}({{ e.check }}){% endif %}
+```
+{{ e.message }}
+```
+{% if e.call_stack %}
+**Call Stack:**
+{% for s in e.call_stack -%}
+- {{ s }}
+{% endfor %}
+{% endif %}
+
 {% endfor %}
 {% endfor %}
 
@@ -70,23 +81,53 @@ def run_cmd(cmd: List[str], cwd: Path) -> subprocess.CompletedProcess:
 
 
 def parse_cmake_errors(stderr: str) -> List[Diagnostic]:
-    """Parses CMake configuration errors."""
-    errors = []
-    pattern = re.compile(r"CMake (Error|Warning) at (.*?):(\d+)")
-    for line in stderr.splitlines():
-        if m := pattern.search(line):
-            errors.append(
-                Diagnostic(
-                    file=m.group(2),
-                    line=int(m.group(3)),
-                    column=0,
-                    severity=m.group(1).lower(),
-                    message=line.strip(),
-                )
+    """Parses CMake configuration errors using a robust state-machine."""
+    diagnostics = []
+    lines = stderr.splitlines()
+    header_re = re.compile(r"^CMake (Error|Warning) at (.*?):(\d+)(?: \((.*?)\))?:")
+
+    current_diag = None
+    in_call_stack = False
+
+    for line in lines:
+        header_match = header_re.match(line)
+        if header_match:
+            if current_diag:
+                diagnostics.append(current_diag)
+            current_diag = Diagnostic(
+                file=header_match.group(2),
+                line=int(header_match.group(3)),
+                column=0,
+                severity=header_match.group(1).lower(),
+                message=line,
+                call_stack=[],
             )
-    if not errors and stderr.strip():
-        errors.append(Diagnostic(None, None, None, "error", stderr.strip()))
-    return errors
+            in_call_stack = False
+            continue
+
+        if current_diag:
+            if line.startswith("Call Stack (most recent call first):"):
+                in_call_stack = True
+                continue
+            if in_call_stack:
+                if line.startswith("  "):
+                    current_diag.call_stack.append(line.strip())
+                else:
+                    in_call_stack = False
+                    diagnostics.append(current_diag)
+                    current_diag = None
+            elif line.startswith("  "):
+                current_diag.message += "\n" + line
+            else:
+                diagnostics.append(current_diag)
+                current_diag = None
+
+    if current_diag:
+        diagnostics.append(current_diag)
+
+    if not diagnostics and stderr.strip():
+        diagnostics.append(Diagnostic(None, None, None, "error", stderr.strip()))
+    return diagnostics
 
 
 def parse_compiler_json(output: str) -> List[Diagnostic]:
@@ -111,6 +152,77 @@ def parse_compiler_json(output: str) -> List[Diagnostic]:
     except Exception:
         pass
     return diags
+
+
+def parse_lint_output(output: str) -> List[Diagnostic]:
+    """Parses cmake-lint output."""
+    diags = []
+    # Pattern: file:line: [check] message
+    pattern = re.compile(
+        r"^(?P<file>.*?):(?P<line>\d+):\s+\[(?P<check>.*?)\]\s+(?P<message>.*)$"
+    )
+    for line in output.splitlines():
+        if m := pattern.match(line):
+            diags.append(
+                Diagnostic(
+                    file=m.group("file"),
+                    line=int(m.group("line")),
+                    column=0,
+                    severity="warning",
+                    message=m.group("message"),
+                    check=m.group("check"),
+                )
+            )
+    return diags
+
+
+def get_git_cmake_files(root: Path) -> List[str]:
+    """Find all CMake files tracked by Git."""
+    try:
+        out = subprocess.check_output(
+            ["git", "ls-files"], cwd=str(root), text=True, stderr=subprocess.DEVNULL
+        )
+        return [
+            line
+            for line in out.splitlines()
+            if line.endswith(".cmake") or line.endswith("CMakeLists.txt")
+        ]
+    except Exception:
+        return []
+
+
+def perform_format_check(root: Path) -> Dict[str, Any]:
+    """Check formatting of CMake files."""
+    files = get_git_cmake_files(root)
+    if not files:
+        return {"success": True, "errors": []}
+
+    # cmake-format --check returns non-zero if formatting is needed
+    cmd = ["cmake-format", "--check"] + files
+    res = run_cmd(cmd, root)
+    success = res.returncode == 0
+    errors = []
+    if not success:
+        errors = [
+            asdict(
+                Diagnostic(
+                    None, None, None, "warning", "Formatting issues found in CMake files."
+                )
+            )
+        ]
+    return {"success": success, "errors": errors}
+
+
+def perform_lint(root: Path) -> Dict[str, Any]:
+    """Run cmake-lint on all tracked CMake files."""
+    files = get_git_cmake_files(root)
+    if not files:
+        return {"success": True, "errors": []}
+
+    cmd = ["cmake-lint"] + files
+    res = run_cmd(cmd, root)
+    errors = parse_lint_output(res.stdout + res.stderr)
+    return {"success": len(errors) == 0, "errors": [asdict(e) for e in errors]}
 
 
 def perform_configure(root: Path, build_dir: Path, preset: str) -> Dict[str, Any]:
@@ -173,7 +285,10 @@ def perform_test(root: Path, build_dir: Path, preset: str, jobs: int) -> Dict[st
 def main() -> int:
     """Main dashboard execution flow."""
     ap = argparse.ArgumentParser(description="Agent-Native CMake Specialist")
-    ap.add_argument("action", choices=["configure", "build", "test", "list", "pipeline"])
+    ap.add_argument(
+        "action",
+        choices=["configure", "build", "test", "lint", "format", "list", "pipeline"],
+    )
     ap.add_argument("--project-root", default=".")
     ap.add_argument("--preset", help="CMake preset name")
     ap.add_argument("--target", action="append", default=[])
@@ -193,13 +308,17 @@ def main() -> int:
 
     preset = args.preset
     if not preset and presets_file.exists():
-        preset = json.loads(presets_file.read_text()).get("configurePresets", [{}])[0].get("name")
+        preset = (
+            json.loads(presets_file.read_text())
+            .get("configurePresets", [{}])[0]
+            .get("name")
+        )
 
-    if not preset:
+    if not preset and args.action not in ["lint", "format"]:
         print(json.dumps({"error": "No preset found"}, indent=2))
         return 1
 
-    build_dir = root / "build" / preset
+    build_dir = root / "build" / (preset or "default")
     if args.clean and build_dir.exists():
         shutil.rmtree(build_dir)
     build_dir.mkdir(parents=True, exist_ok=True)
@@ -216,7 +335,8 @@ def main() -> int:
     else:
         all_results = {}
 
-    for p in ["configure", "build", "test"]:
+    phases = ["format", "lint", "configure", "build", "test"]
+    for p in phases:
         if p not in all_results:
             all_results[p] = {
                 "success": None,
@@ -225,11 +345,15 @@ def main() -> int:
                 "last_run": None,
             }
 
-    steps = ["configure", "build", "test"] if args.action == "pipeline" else [args.action]
+    steps = phases if args.action == "pipeline" else [args.action]
     overall_success, current_ts = True, datetime.now().isoformat()
 
     for step in steps:
-        if step == "configure":
+        if step == "format":
+            res = perform_format_check(root)
+        elif step == "lint":
+            res = perform_lint(root)
+        elif step == "configure":
             res = perform_configure(root, build_dir, preset)
         elif step == "build":
             res = perform_build(root, build_dir, args.jobs, args.target)
