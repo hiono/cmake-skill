@@ -6,6 +6,7 @@ description: |
     2. Capture and parse multi-line configuration errors or call stacks,
     3. Maintain project health visibility via a persistent dashboard.
   Triggers: "CMake build", "CMake configure", "cmake test", "CMake error", "build failure", "CMake diagnostics".
+agent: build
 models:
   - copilot/gpt-4.1
   - copilot/gpt-4o
