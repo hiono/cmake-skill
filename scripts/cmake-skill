@@ -69,7 +69,7 @@ MARKDOWN_TEMPLATE = """
 {% endfor %}
 
 ---
-*Detailed reports available in build dir's `.lint` folder.*
+*Detailed reports available in build dir's `cmake_reports` folder.*
 """
 
 
@@ -372,7 +372,7 @@ def main() -> int:
     rep_md = Template(MARKDOWN_TEMPLATE).render(
         timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"), results=all_results
     )
-    (root / "cmake_report.md").write_text(rep_md)
+    (report_dir / "cmake_report.md").write_text(rep_md)
 
     summary = {
         "quick_ref": {
@@ -381,6 +381,17 @@ def main() -> int:
         },
         "artifacts": {"machine_report": str(report_json_path.resolve())},
     }
+
+    # Write manifest for cross-skill discovery
+    manifest = {
+        "preset": preset or "default",
+        "report_dir": str(report_dir.resolve()),
+        "json_report": str(report_json_path.resolve()),
+        "md_report": str((report_dir / "cmake_report.md").resolve()),
+        "timestamp": datetime.now().isoformat(),
+    }
+    (root / ".cmake-skill-manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
+
     print(json.dumps(summary, ensure_ascii=False))
     return 0 if overall_success else 1
 
