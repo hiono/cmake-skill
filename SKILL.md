@@ -1,7 +1,11 @@
 ---
 name: cmake-skill
-description: "Agent-native CMake lifecycle automation. Use when Claude needs to: (1) Configure, build, or test CMake projects, (2) Capture and parse multi-line configuration errors or call stacks, or (3) Maintain project health visibility via a persistent dashboard. Triggers: \"CMake build\", \"CMake configure\", \"cmake test\", \"CMake error\", \"build failure\", \"CMake diagnostics\"."
-agent: build
+description: |
+  Agent-native CMake lifecycle automation with persistent project health monitoring. Use when Claude needs to:
+    1. Configure, build, or test CMake projects,
+    2. Capture and parse multi-line configuration errors or call stacks,
+    3. Maintain project health visibility via a persistent dashboard.
+  Triggers: "CMake build", "CMake configure", "cmake test", "CMake error", "build failure", "CMake diagnostics".
 models:
   - copilot/gpt-4.1
   - copilot/gpt-4o
