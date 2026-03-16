@@ -1,17 +1,27 @@
+---
 name: cmake-skill
-description: "Agent-native CMake lifecycle automation. Use when Claude needs to: (1) Configure, build, or test CMake projects, (2) Capture and parse multi-line configuration errors or call stacks, or (3) Maintain project health visibility via a persistent dashboard."
+description: "Agent-native CMake lifecycle automation. Use when Claude needs to: (1) Configure, build, or test CMake projects, (2) Capture and parse multi-line configuration errors or call stacks, or (3) Maintain project health visibility via a persistent dashboard. Triggers: \"CMake build\", \"CMake configure\", \"cmake test\", \"CMake error\", \"build failure\", \"CMake diagnostics\"."
+agent: build
+models:
+  - copilot/gpt-4.1
+  - copilot/gpt-4o
+  - opencode/big-picle
+---
 
 # CMake Build & Diagnostics
 
 Manage CMake projects with persistent situational awareness.
 
-## 📋 Workflow
+## Resources
 
-1. **Orchestration**: Prefer `./skill/cmake-skill/scripts/cmake-skill pipeline` for full verification.
-2. **Monitoring**: Review `cmake_report.md` at project root for an immediate health summary.
-3. **Extraction**: Parse `.lint/cmake_report.json` for structured diagnostic data.
-4. **Customization**: Adjust `.cmake-format.py` to add specs for project-specific commands.
+- **Error parsing**: `references/protocol.md` for hierarchical error parsing and state management logic.
+- **Dashboard**: Review `cmake_report.md` at project root for health summary.
+- **Script**: `scripts/cmake-skill` for the full pipeline.
 
-## 🤖 Failure Recovery
+## Workflow
 
-Refer to **[protocol.md](references/protocol.md)** for hierarchical error parsing and state management logic.
+1. **Orchestrate**: Run `scripts/cmake-skill pipeline` for full verification.
+2. **Monitor**: Review `cmake_report.md` at project root for health summary.
+3. **Extract**: Parse `.lint/cmake_report.json` for structured diagnostic data.
+4. **Customize**: Adjust `.cmake-format.py` to add specs for project-specific commands.
+   **Build fails?** → Read `references/protocol.md` for hierarchical error parsing and state management.
