@@ -323,6 +323,16 @@ def main() -> int:
         print(json.dumps({"error": "No preset found"}, indent=2))
         return 1
 
+    # Preset fallback chain (common naming patterns)
+    FALLBACK_PRESETS = [
+        "linux-release", "rel", "release",
+        "linux-debug", "debug", "dbg",
+        "dev", "develop", "development",
+        "doc", "docs", "default",
+    ]
+    active_preset = preset
+    preset_candidates = [preset] + [p for p in FALLBACK_PRESETS if p != preset]
+
     build_dir = root / "build" / (preset or "default")
     if args.clean and build_dir.exists():
         shutil.rmtree(build_dir)
@@ -359,11 +369,25 @@ def main() -> int:
         elif step == "lint":
             res = perform_lint(root)
         elif step == "configure":
-            res = perform_configure(root, build_dir, preset)
+            # Preset auto-fallback: try candidates until one succeeds
+            res = None
+            for candidate in preset_candidates:
+                candidate_build_dir = root / "build" / candidate
+                candidate_build_dir.mkdir(parents=True, exist_ok=True)
+                test_res = perform_configure(root, candidate_build_dir, candidate)
+                if test_res["success"]:
+                    res = test_res
+                    active_preset = candidate
+                    build_dir = candidate_build_dir
+                    break
+                else:
+                    res = test_res  # Keep last failure for reporting
+            if res is None:
+                res = {"success": False, "errors": [{"severity": "error", "message": "All presets failed"}]}
         elif step == "build":
             res = perform_build(root, build_dir, args.jobs, args.target)
         else:
-            res = perform_test(root, build_dir, preset, args.jobs)
+            res = perform_test(root, build_dir, active_preset, args.jobs)
 
         res["last_run"] = current_ts
         res["status_icon"] = "✅ SUCCESS" if res["success"] else "❌ FAILED"
@@ -387,12 +411,12 @@ def main() -> int:
         "artifacts": {"machine_report": str(report_json_path.resolve())},
     }
 
-    # Write manifest for cross-skill discovery
+    # Write manifest for cross-skill discovery (relative paths for portability)
     manifest = {
-        "preset": preset or "default",
-        "report_dir": str(report_dir.resolve()),
-        "json_report": str(report_json_path.resolve()),
-        "md_report": str((report_dir / "cmake_report.md").resolve()),
+        "preset": active_preset or "default",
+        "report_dir": str(report_dir.relative_to(root)),
+        "json_report": str(report_json_path.relative_to(root)),
+        "md_report": str((report_dir / "cmake_report.md").relative_to(root)),
         "timestamp": datetime.now().isoformat(),
     }
     (root / ".cmake-skill-manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
