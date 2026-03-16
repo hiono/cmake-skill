@@ -1,4 +1,4 @@
-#!/usr/bin/env -S uv run
+#!/usr/bin/env python3
 # /// script
 # requires-python = ">=3.12"
 # dependencies = [
@@ -18,12 +18,17 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from jinja2 import Template
+try:
+    from jinja2 import Template
+except ImportError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "jinja2", "-q"])
+    from jinja2 import Template
 
 
 @dataclass
