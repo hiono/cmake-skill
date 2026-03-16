@@ -24,3 +24,14 @@ Manage CMake projects with persistent situational awareness.
 3. **Extract**: Parse `build/<preset>/cmake_reports/cmake_report.json` for structured diagnostic data.
 4. **Customize**: Adjust `.cmake-format.py` to add specs for project-specific commands.
    **Build fails?** → Read `references/protocol.md` for hierarchical error parsing and state management.
+
+## Execution
+
+**Always use `uv run --script` to execute this skill:**
+```bash
+uv run --script scripts/cmake-skill <action> [options]
+```
+
+**Why:** Python environments managed by uv (PEP 668 externally-managed) block `pip install`. Running with `python3` directly will fail when auto-installing jinja2. `uv run --script` handles PEP 723 inline dependencies correctly.
+
+**Note:** Run from the skill root directory (`~/.agents/skills/cmake-skill/`) or use the agent's skill tool to resolve the path.
