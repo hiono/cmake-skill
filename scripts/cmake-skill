@@ -412,6 +412,8 @@ def main() -> int:
     }
 
     # Write manifest for cross-skill discovery (relative paths for portability)
+    agents_dir = root / "build" / ".agents"
+    agents_dir.mkdir(parents=True, exist_ok=True)
     manifest = {
         "preset": active_preset or "default",
         "report_dir": str(report_dir.relative_to(root)),
@@ -419,7 +421,7 @@ def main() -> int:
         "md_report": str((report_dir / "cmake_report.md").relative_to(root)),
         "timestamp": datetime.now().isoformat(),
     }
-    (root / ".cmake-skill-manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
+    (agents_dir / "cmake-skill-manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
 
     print(json.dumps(summary, ensure_ascii=False))
     return 0 if overall_success else 1
