@@ -27,11 +27,14 @@ Manage CMake projects with persistent situational awareness.
 
 ## Execution
 
-**Always use `uv run --script` to execute this skill:**
-```bash
-uv run --script scripts/cmake-skill <action> [options]
-```
+To run this skill manually, locate the script in the skill directory (for example, `~/.agents/skills/cmake-skill/scripts/cmake-skill`)
+and execute it from the project root directory.
+
+Example:
+  ~/.agents/skills/cmake-skill/scripts/cmake-skill pipeline
+
+Note: The `~/` in the example will be expanded to your home directory by the shell.
 
 **Why:** Python environments managed by uv (PEP 668 externally-managed) block `pip install`. Running with `python3` directly will fail when auto-installing jinja2. `uv run --script` handles PEP 723 inline dependencies correctly.
 
-**Note:** Run from the skill root directory (`~/.agents/skills/cmake-skill/`) or use the agent's skill tool to resolve the path.
+**Note:** This skill is designed to be run from the project root directory. The skill tool handles the path resolution when invoked via `@skill`.
